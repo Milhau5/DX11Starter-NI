@@ -13,6 +13,11 @@ public:
 	DirectX::XMFLOAT4X4 GetMatrixP();
 	DirectX::XMFLOAT4X4 GetMatrixV();
 
+	void UpdateProjectionMatrix(unsigned int w, unsigned int h);
+
+	void UpdateXRotation();
+	void UpdateYRotation();
+
 	~Camera();
 private:
 	DirectX::XMFLOAT4X4 camProjMatrix;
@@ -21,14 +26,7 @@ private:
 	//need these to create a "look-to" view matrix
 	DirectX::XMFLOAT3 camPos;
 	DirectX::XMFLOAT3 camDir;
-	float rotAroundX; //used to be regular floats
+	float rotAroundX;
 	float rotAroundY;
-
-	//TO-DO:
-	//1. Fix keyboard input (code is done)
-	//2. Fix Mouse Input (code is done)
-	//3. Copy-paste code to update Projection Matrix
-	//4. Materials
-	//3+4 can be done on the same day, both are short
 };
 

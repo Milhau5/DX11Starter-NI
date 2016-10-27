@@ -1,5 +1,6 @@
 #include "Game.h"
 #include "Vertex.h"
+#include "WICTextureLoader.h"
 
 // For the DirectX Math library
 using namespace DirectX;
@@ -55,9 +56,13 @@ Game::~Game()
 
 	delete one;
 	delete two;
-	delete three;
 
 	delete camNewton;
+
+	delete test;
+
+	if (resource) { resource->Release(); }
+	if (freeSamples) { freeSamples->Release(); }
 }
 
 // --------------------------------------------------------
@@ -66,12 +71,26 @@ Game::~Game()
 // --------------------------------------------------------
 void Game::Init()
 {
+	camNewton = new Camera();
+
+	camNewton->UpdateProjectionMatrix(width, height); //should be called here
+
+	dLightful.AmbientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+	dLightful.DiffuseColor = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+	dLightful.Direction = XMFLOAT3(+1.0f, -1.0f, +0.0f);
+	//
+	secondLight.AmbientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
+	secondLight.DiffuseColor = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
+	secondLight.Direction = XMFLOAT3(-1.0f, -1.0f, +0.0f);
+
 	// Helper methods for loading shaders, creating some basic
 	// geometry to draw and some simple camera matrices.
 	//  - You'll be expanding and/or replacing these later
 	LoadShaders();
 	CreateMatrices();
 	CreateBasicGeometry();
+
+	//TEXTURE code here (maybe)
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -168,26 +187,26 @@ void Game::CreateBasicGeometry()
 	//    over to a DirectX-controlled data structure (the vertex buffer)
 	Vertex vertices[] = 
 	{
-		{ XMFLOAT3(+0.0f, +1.0f, +0.0f), red },
-		{ XMFLOAT3(+1.5f, -1.0f, +0.0f), blue },
-		{ XMFLOAT3(-1.5f, -1.0f, +0.0f), green },
+		{ XMFLOAT3(+0.0f, +1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
+		{ XMFLOAT3(+1.5f, -1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
+		{ XMFLOAT3(-1.5f, -1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
 	};
 
 	//Shape 2
 	Vertex verticesTwo[] =
 	{
-		{ XMFLOAT3(+0.0f, -1.0f, +0.0f), red },  //original verts: opposite of 1
-		{ XMFLOAT3(-1.5f, +1.0f, +0.0f), red },
-		{ XMFLOAT3(+1.5f, +1.0f, +0.0f), red },
+		{ XMFLOAT3(+0.0f, -1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },  //original verts: opposite of 1
+		{ XMFLOAT3(-1.5f, +1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
+		{ XMFLOAT3(+1.5f, +1.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
 	};
 
 	//Shape 3
 	Vertex verticesThree[] =
 	{
-		{ XMFLOAT3(-2.0f, -2.0f, +0.0f), green }, //original verts: all +- 1's instead of 2's
-		{ XMFLOAT3(-2.0f, +2.0f, +0.0f), green },
-		{ XMFLOAT3(+2.0f, +2.0f, +0.0f), green },
-		{ XMFLOAT3(+2.0f, -2.0f, +0.0f), green}
+		{ XMFLOAT3(-2.0f, -2.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) }, //original verts: all +- 1's instead of 2's
+		{ XMFLOAT3(-2.0f, +2.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
+		{ XMFLOAT3(+2.0f, +2.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) },
+		{ XMFLOAT3(+2.0f, -2.0f, +0.0f), XMFLOAT3(+0.0f, +0.0f, -1.0f), XMFLOAT2(0.0f, 0.0f) }
 	};
 
 	// Set up the indices, which tell us which vertices to use and in which order
@@ -201,16 +220,34 @@ void Game::CreateBasicGeometry()
 
 	unsigned int indicesThree[] = { 0, 1, 2, 0, 2, 3 };
 
-	timmy = new Mesh(vertices, 3, indices, 3, device);
+	//
+	HRESULT result = CreateWICTextureFromFile(device, context, L"Debug/Assets/Textures/eric_andre.jpg", 0, &resource);
+
+	D3D11_SAMPLER_DESC sampleState = {};
+	sampleState.AddressU = D3D11_TEXTURE_ADDRESS_WRAP; //Other options: Mirror, Clamp, Border, Mirror_Once
+	sampleState.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampleState.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+	sampleState.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR; //trinlinear filtering
+	sampleState.MaxLOD = D3D11_FLOAT32_MAX; //enable mipmapping
+
+	device->CreateSamplerState(&sampleState, &freeSamples);
+	//break point here to verify if it is working
+
+	pixelShader->SetSamplerState("basicSampler", freeSamples);
+	pixelShader->SetShaderResourceView("diffuseTexture", resource);
+
+	//timmy = new Mesh(vertices, 3, indices, 3, device);
+	timmy = new Mesh("Debug/Assets/Models/cube.obj", device);
+	
+	test = new Material(vertexShader, pixelShader, resource, freeSamples);
 
 	//Create two more shapes. Make vertexes and indices, and then create Mesh objects with those params
 	//wanda = new Mesh(verticesTwo, 3, indicesTwo, 3, device);
 	//cosmo = new Mesh(verticesThree, 4, indicesThree, 6, device);
 
 	//test entities...have several share one shape
-	one = new Entity(timmy);
-	two = new Entity(timmy);
-	three = new Entity(timmy);
+	one = new Entity(timmy, test);
+	two = new Entity(timmy, test);
 }
 
 
@@ -230,6 +267,8 @@ void Game::OnResize()
 		0.1f,				  	// Near clip plane distance
 		100.0f);			  	// Far clip plane distance
 	XMStoreFloat4x4(&projectionMatrix, XMMatrixTranspose(P)); // Transpose for HLSL!
+
+	camNewton->UpdateProjectionMatrix(width, height);
 }
 
 // --------------------------------------------------------
@@ -282,71 +321,35 @@ void Game::Draw(float deltaTime, float totalTime)
 		1.0f,
 		0);
 
-	// Send data to shader variables
-	//  - Do this ONCE PER OBJECT you're drawing
-	//  - This is actually a complex process of copying data to a local buffer
-	//    and then copying that entire buffer to the GPU.  
-	//  - The "SimpleShader" class handles all of that for you.
-	vertexShader->SetMatrix4x4("world", one->GetMatrix());
-	vertexShader->SetMatrix4x4("view", camNewton->GetMatrixV()); //NOW camera's view matrix
-	vertexShader->SetMatrix4x4("projection", projectionMatrix);
+	pixelShader->SetData(
+		"light",
+		&dLightful, //same as above?
+		sizeof(DirectionalLight)
+	);
 
-	// Once you've set all of the data you care to change for
-	// the next draw call, you need to actually send it to the GPU
-	//  - If you skip this, the "SetMatrix" calls above won't make it to the GPU!
-	vertexShader->CopyAllBufferData();
+	pixelShader->SetData(
+		"newLight",
+		&secondLight, //same as above?
+		sizeof(DirectionalLight)
+	);
 
-	vertexShader->SetShader();
+	pixelShader->CopyAllBufferData();
 	pixelShader->SetShader();
-
+	
+	one->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP());
 	one->Draw(context);
 
-	//ENTITY2
-	vertexShader->SetMatrix4x4("world", two->GetMatrix());
-	vertexShader->SetMatrix4x4("view", camNewton->GetMatrixV()); //NOW camera's view matrix
-	vertexShader->SetMatrix4x4("projection", projectionMatrix); 
+	/*pixelShader->SetData(
+		"light",
+		&dLightful, //same as above?
+		sizeof(DirectionalLight)
+	);
 
-	vertexShader->CopyAllBufferData();
-
-	// Set the vertex and pixel shaders to use for the next Draw() command
-	//  - These don't technically need to be set every frame...YET
-	//  - Once you start applying different shaders to different objects,
-	//    you'll need to swap the current shaders before each draw
-	vertexShader->SetShader();
-	pixelShader->SetShader();
-
+	pixelShader->CopyAllBufferData();
+	pixelShader->SetShader();*/
+	
+	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP());
 	two->Draw(context);
-	
-	
-	//Shape 2 (hope this works)
-	/*UINT strideTwo = sizeof(Vertex);
-	UINT offsetTwo = 0;
-	ID3D11Buffer * tempTwo = wanda->GetVertexBuffer();
-	context->IASetVertexBuffers(0, 1, &tempTwo, &strideTwo, &offsetTwo);
-	context->IASetIndexBuffer(wanda->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
-
-	//
-	context->DrawIndexed(
-		wanda->GetIndexCount(),     // The number of indices to use (we could draw a subset if we wanted)
-		0,     // Offset to the first index we want to use
-		0);    // Offset to add to each index when looking up vertices
-		
-
-	//Shape 3
-	UINT strideThree = sizeof(Vertex);
-	UINT offsetThree = 0;
-	ID3D11Buffer * tempThree = cosmo->GetVertexBuffer();
-	context->IASetVertexBuffers(0, 1, &tempThree, &strideThree, &offsetThree);
-	context->IASetIndexBuffer(cosmo->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
-
-	//
-	context->DrawIndexed(
-		cosmo->GetIndexCount(),     // The number of indices to use (we could draw a subset if we wanted)
-		0,     // Offset to the first index we want to use
-		0);    // Offset to add to each index when looking up vertices
-		*/
-
-
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it
@@ -356,17 +359,6 @@ void Game::Draw(float deltaTime, float totalTime)
 
 
 #pragma region Mouse Input
-
-void Game::RotateAroundX(float x)
-{
-	//x++;
-}
-
-void Game::RotateAroundY(float y)
-{
-	//y++;
-}
-
 // --------------------------------------------------------
 // Helper method for mouse clicking.  We get this information
 // from the OS-level messages anyway, so these helpers have
@@ -375,13 +367,7 @@ void Game::RotateAroundY(float y)
 void Game::OnMouseDown(WPARAM buttonState, int x, int y)
 {
 	// Add any custom code here...
-	/*
-	if(buttonState & 0x0001) { RotateAroundX(camNewton->rotAroundX };
-	*/
-	/*
-	if(buttonState & 0x0002) { RotateAroundY(camNewton->rotAroundY };
-	*/
-
+	
 	// Save the previous mouse position, so we have it for the future
 	prevMousePos.x = x;
 	prevMousePos.y = y;
@@ -398,7 +384,6 @@ void Game::OnMouseDown(WPARAM buttonState, int x, int y)
 void Game::OnMouseUp(WPARAM buttonState, int x, int y)
 {
 	// Add any custom code here...
-	// What to do on mouse release?
 
 	// We don't care about the tracking the cursor outside
 	// the window anymore (we're not dragging if the mouse is up)
@@ -413,6 +398,9 @@ void Game::OnMouseUp(WPARAM buttonState, int x, int y)
 void Game::OnMouseMove(WPARAM buttonState, int x, int y)
 {
 	// Add any custom code here...
+	if (buttonState & 0x0001) { camNewton->UpdateXRotation(); }
+
+	if (buttonState & 0x0002) { camNewton->UpdateYRotation(); }
 
 	// Save the previous mouse position, so we have it for the future
 	prevMousePos.x = x;

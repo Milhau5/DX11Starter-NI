@@ -5,6 +5,8 @@
 #include "Mesh.h"
 #include "Entity.h"
 #include "Camera.h"
+#include "Material.h"
+#include "Lights.h"
 #include <DirectXMath.h>
 
 class Game 
@@ -27,9 +29,6 @@ public:
 	void OnMouseUp	 (WPARAM buttonState, int x, int y);
 	void OnMouseMove (WPARAM buttonState, int x, int y);
 	void OnMouseWheel(float wheelDelta,   int x, int y);
-	//new methods for the mous
-	void RotateAroundX(float x);
-	void RotateAroundY(float y);
 private:
 
 	// Initialization helper methods - feel free to customize, combine, etc.
@@ -47,8 +46,16 @@ private:
 	Entity * two;
 	Entity * three;
 
-	//Camera
+	//Camera stuff
 	Camera * camNewton;
+	DirectX::XMFLOAT4X4 holdCamMatrix;
+
+	//Material(s)
+	Material * test;
+
+	//Light(s)
+	DirectionalLight dLightful;
+	DirectionalLight secondLight;
 
 	// Wrappers for DirectX shaders to provide simplified functionality
 	SimpleVertexShader* vertexShader;
@@ -62,5 +69,8 @@ private:
 	// Keeps track of the old mouse position.  Useful for 
 	// determining how far the mouse moved in a single frame.
 	POINT prevMousePos;
+
+	ID3D11ShaderResourceView* resource; //how to initialize?
+	ID3D11SamplerState* freeSamples;
 };
 

@@ -12,7 +12,34 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;
-	float4 color		: COLOR;
+	float3 normal       : NORMAL;
+	float2 uv           : TEXCOORD;
+	//float4 color		: COLOR;
+};
+
+//Globals
+Texture2D diffuseTexture   : register(t0);
+SamplerState basicSampler  : register(s0);
+
+//A new directional light
+//we don't need semantics
+struct DirectionalLight
+{
+	float4 AmbientColor;
+	float4 DiffuseColor;
+	float3 Direction;
+};
+
+// Constant Buffer
+// - Allows us to define a buffer of individual variables 
+//    which will (eventually) hold data from our C++ code
+// - All non-pipeline variables that get their values from 
+//    our C++ code must be defined inside a Constant Buffer
+// - The name of the cbuffer itself is unimportant
+cbuffer externalLight : register(b0)
+{
+	DirectionalLight light;
+	DirectionalLight newLight;
 };
 
 // --------------------------------------------------------
@@ -26,9 +53,27 @@ struct VertexToPixel
 // --------------------------------------------------------
 float4 main(VertexToPixel input) : SV_TARGET
 {
-	// Just return the input color
-	// - This color (like most values passing through the rasterizer) is 
-	//   interpolated for each pixel between the corresponding vertices 
-	//   of the triangle we're rendering
-	return input.color;
+	float3 updated = normalize(input.normal);
+	input.normal = updated;
+
+	//sample the texture
+	float4 surfaceColor = diffuseTexture.Sample(basicSampler, input.uv);
+
+	//Normalized direction TO the light
+	float3 goTowardsTheLight = -normalize(light.Direction);
+	//Light amount
+	float dProduct = saturate(dot(input.normal, goTowardsTheLight)); //used to be a float4
+	//Return final surface color
+	float4 finalResult = (light.DiffuseColor * dProduct * surfaceColor) + (light.AmbientColor * surfaceColor);
+
+	//Normalized direction TO the light
+	float3 goToLight = -normalize(newLight.Direction);
+	//Light amount
+	float amount = saturate(dot(input.normal, goToLight)); //used to be a float4
+	//Return final surface color
+	float4 nextResult = (newLight.DiffuseColor * amount * surfaceColor) + (newLight.AmbientColor * surfaceColor);
+
+	return finalResult + nextResult;
+	//float3 finalColor = (light.DiffuseColor * dProduct) + (newLight.DiffuseColor * amount);
+	//return float4(finalColor, 1);
 }

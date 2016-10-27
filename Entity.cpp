@@ -2,15 +2,16 @@
 
 using namespace DirectX;
 
-Entity::Entity(Mesh * mesh)
+Entity::Entity(Mesh * mesh, Material * material) //will eventually take a material
 {
 	//accept Mesh pointer
 	meshingAround = mesh;
+	girlInAMaterialWorld = material;
 	
 	//set default values for the XMFLOATs
 	worldMatrix = XMFLOAT4X4(); //just call the default constructor
 	posVector = XMFLOAT3(0, 0, 0);
-	rotVector = XMFLOAT3(0, 0, 0); //mesh rotates around the z-axis, usually
+	rotVector = XMFLOAT3(0, 0, 0);
 	scaleVector = XMFLOAT3(1, 1, 1);
 }
 
@@ -72,7 +73,30 @@ void Entity::Move()
 		XMMatrixTranspose(zaWarudo));
 }
 
-void Entity::Draw(ID3D11DeviceContext *context)
+void Entity::PrepareMaterial(XMFLOAT4X4 viewMatrix, XMFLOAT4X4 projMatrix)
+{
+	SimpleVertexShader* v = girlInAMaterialWorld->GetVertexShader();
+	SimplePixelShader* p = girlInAMaterialWorld->GetPixelShader();
+	
+	// Send data to shader variables
+	//  - Do this ONCE PER OBJECT you're drawing
+	//  - This is actually a complex process of copying data to a local buffer
+	//    and then copying that entire buffer to the GPU.  
+	//  - The "SimpleShader" class handles all of that for you.
+	v->SetMatrix4x4("world", GetMatrix());
+	v->SetMatrix4x4("view", viewMatrix); //NOW camera's view matrix
+	v->SetMatrix4x4("projection", projMatrix);
+
+	// Once you've set all of the data you care to change for
+	// the next draw call, you need to actually send it to the GPU
+	//  - If you skip this, the "SetMatrix" calls above won't make it to the GPU!
+	v->CopyAllBufferData();
+
+	v->SetShader();
+	p->SetShader();
+}
+
+void Entity::Draw(ID3D11DeviceContext *context) //may take camera matrices in later versions...
 {
 	//jus do sum drawing sheeit
 	// Set buffers in the input assembler
@@ -81,7 +105,7 @@ void Entity::Draw(ID3D11DeviceContext *context)
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 	ID3D11Buffer * temp = meshingAround->GetVertexBuffer();
-	context->IASetVertexBuffers(0, 1, &temp, &stride, &offset);
+	context->IASetVertexBuffers(0, 1, &temp, &stride, &offset); //PROBLEM ON THIS LINE
 	context->IASetIndexBuffer(meshingAround->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 
 	// Finally do the actual drawing

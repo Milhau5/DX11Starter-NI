@@ -1,3 +1,6 @@
-﻿  Camera.cpp
-  DX11Starter.vcxproj -> \\banner.main.ad.rit.edu\students\nai7804\IGMProfile\Desktop\DX11Starter-HW3\Debug\DX11Starter.exe
-  DX11Starter.vcxproj -> \\banner.main.ad.rit.edu\students\nai7804\IGMProfile\Desktop\DX11Starter-HW3\Debug\DX11Starter.pdb (Full PDB)
+﻿  Main.cpp
+  Game.cpp
+  Generating Code...
+Camera.obj : warning LNK4075: ignoring '/EDITANDCONTINUE' due to '/OPT:LBR' specification
+  DX11Starter.vcxproj -> \\banner.main.ad.rit.edu\students\nai7804\IGMProfile\Desktop\DX11Starter-NI\Debug\DX11Starter.exe
+  DX11Starter.vcxproj -> \\banner.main.ad.rit.edu\students\nai7804\IGMProfile\Desktop\DX11Starter-NI\Debug\DX11Starter.pdb (Full PDB)
