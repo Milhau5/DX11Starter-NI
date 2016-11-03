@@ -12,9 +12,9 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;
+	float4 worldSpace   : TEXTCOORD1;
 	float3 normal       : NORMAL;
 	float2 uv           : TEXCOORD;
-	//float4 color		: COLOR;
 };
 
 //Globals
@@ -42,6 +42,23 @@ cbuffer externalLight : register(b0)
 	DirectionalLight newLight;
 };
 
+//we would want to eventually use this instead of making temp values (see main() below)
+/*cbuffer fogVariables : register(c0)
+{
+	const float FogEnabled;
+	const float FogStart;
+	const float FogEnd;
+	const float FogColor;
+};*/
+
+//lets see what we can do with this
+/*float ComputeFogFactor(float d) {
+	//d is the distance to the geometry sampling from the camera
+	//this simply returns a value that interpolates from 0 to 1 
+	//with 0 starting at FogStart and 1 at FogEnd 
+	return clamp((d - FogStart) / (FogEnd - FogStart), 0, 1) * FogEnabled;
+}*/
+
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
 // 
@@ -55,6 +72,18 @@ float4 main(VertexToPixel input) : SV_TARGET
 {
 	float3 updated = normalize(input.normal);
 	input.normal = updated;
+
+	//fog-related stuff
+	float dist = 0;
+	float fogFactor = 0;
+	float4 fogColor = float4(0.5, 0.5, 0.5, 1.0); //grey
+
+	//range-based
+	dist = length(input.worldSpace); //mag
+
+	//linear fog
+	fogFactor = (10 - dist) / (10 - 5);
+	fogFactor = clamp(fogFactor, 0.0, 1.0);
 
 	//sample the texture
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler, input.uv);
@@ -73,7 +102,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//Return final surface color
 	float4 nextResult = (newLight.DiffuseColor * amount * surfaceColor) + (newLight.AmbientColor * surfaceColor);
 
-	return finalResult + nextResult;
-	//float3 finalColor = (light.DiffuseColor * dProduct) + (newLight.DiffuseColor * amount);
-	//return float4(finalColor, 1);
+	//return finalResult + nextResult;
+	float4 tempResult = finalResult + nextResult;
+
+	float4 finalColor = lerp(fogColor, tempResult, fogFactor);
+	return finalColor;
+	
 }
