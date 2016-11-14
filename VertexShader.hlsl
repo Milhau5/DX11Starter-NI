@@ -27,6 +27,7 @@ struct VertexShaderInput
 	float3 position		: POSITION;     // XYZ position
 	float3 normal       : NORMAL;
 	float2 uv           : TEXTCOORD;
+	//float3 tangent      : TANGENT;
 };
 
 // Struct representing the data we're sending down the pipeline
@@ -42,8 +43,10 @@ struct VertexToPixel
 	//  |    |                |
 	//  v    v                v
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
-	float4 worldSpace   : TEXTCOORD1;
+	float4 worldSpace   : TEXTCOORD1; //fog
 	float3 normal       : NORMAL;
+	//float3 worldPos     : POSITION; //sky
+	//float3 tangent      : TANGENT;
 	float2 uv           : TEXCOORD;
 };
 
@@ -80,12 +83,11 @@ VertexToPixel main( VertexShaderInput input )
 	//useful for us (now) because shapes are on a uniform scale
 	output.normal = mul(input.normal, (float3x3)world);
 
-	// Pass the color through 
-	// - The values will be interpolated per-pixel by the rasterizer
-	// - We don't need to alter it here, but we do need to send it to the pixel shader
-	//output.color = input.color;
-	//output.normal = input.normal;
+	//tan
+	//output.tangent = mul(input.tangent, (float3x3)world); // Needed for normal mapping
 
+    // Get world position of vertex
+	//output.worldPos = mul(float4(input.position, 1.0f), world).xyz;
 
 	//UVs
 	output.uv = input.uv;

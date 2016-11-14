@@ -36,6 +36,16 @@ private:
 	void CreateMatrices();
 	void CreateBasicGeometry();
 
+	// Texture related DX stuff, may not need some of the things
+	ID3D11ShaderResourceView* textureSRV;
+	ID3D11ShaderResourceView* normalMapSRV;
+	ID3D11ShaderResourceView* skySRV;
+	ID3D11SamplerState* sampler;
+
+	// Render states
+	ID3D11RasterizerState* skyRastState;
+	ID3D11DepthStencilState* skyDepthState;
+
 	//meshes
 	Mesh * timmy;
 	Mesh * wanda;
@@ -60,6 +70,9 @@ private:
 	// Wrappers for DirectX shaders to provide simplified functionality
 	SimpleVertexShader* vertexShader;
 	SimplePixelShader* pixelShader;
+
+	SimpleVertexShader* skyVS;
+	SimplePixelShader* skyPS;
 
 	// The matrices to go from model space to screen space
 	DirectX::XMFLOAT4X4 worldMatrix;

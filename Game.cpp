@@ -1,6 +1,7 @@
 #include "Game.h"
 #include "Vertex.h"
 #include "WICTextureLoader.h"
+#include "DDSTextureLoader.h"
 
 // For the DirectX Math library
 using namespace DirectX;
@@ -46,6 +47,8 @@ Game::~Game()
 	// will clean up their own internal DirectX stuff
 	delete vertexShader;
 	delete pixelShader;
+	delete skyVS;
+	delete skyPS;
 
 	//get rid of meshes when done
 	/*delete timmy;
@@ -63,6 +66,13 @@ Game::~Game()
 
 	if (resource) { resource->Release(); }
 	if (freeSamples) { freeSamples->Release(); }
+
+	//sampler->Release(); //come back in
+	//textureSRV->Release();
+	//normalMapSRV->Release();
+	skySRV->Release();
+	skyDepthState->Release();
+	skyRastState->Release();
 }
 
 // --------------------------------------------------------
@@ -92,6 +102,24 @@ void Game::Init()
 
 	//TEXTURE code here (maybe)
 
+	// Load the cube map (without mipmaps!  Don't pass in the context)
+	CreateDDSTextureFromFile(device, L"Debug/Assets/Textures/Ni.dds", 0, &skySRV);
+
+	// Create a rasterizer state so we can render backfaces
+	D3D11_RASTERIZER_DESC rsDesc = {};
+	rsDesc.FillMode = D3D11_FILL_SOLID;
+	rsDesc.CullMode = D3D11_CULL_FRONT;
+	rsDesc.DepthClipEnable = true;
+	device->CreateRasterizerState(&rsDesc, &skyRastState);
+
+	// Create a depth state so that we can accept pixels
+	// at a depth less than or EQUAL TO an existing depth
+	D3D11_DEPTH_STENCIL_DESC dsDesc = {};
+	dsDesc.DepthEnable = true;
+	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+	dsDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL; // Make sure we can see the sky (at max depth)
+	device->CreateDepthStencilState(&dsDesc, &skyDepthState);
+
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
 	// Essentially: "What kind of shape should the GPU draw with our data?"
@@ -113,6 +141,14 @@ void Game::LoadShaders()
 	pixelShader = new SimplePixelShader(device, context);
 	if(!pixelShader->LoadShaderFile(L"Debug/PixelShader.cso"))	
 		pixelShader->LoadShaderFile(L"PixelShader.cso");
+
+	skyVS = new SimpleVertexShader(device, context);
+	if (!skyVS->LoadShaderFile(L"Debug/SkyVS.cso"))
+		skyVS->LoadShaderFile(L"SkyVS.cso");
+
+	skyPS = new SimplePixelShader(device, context);
+	if (!skyPS->LoadShaderFile(L"Debug/SkyPS.cso"))
+		skyPS->LoadShaderFile(L"SkyPS.cso");
 
 	// You'll notice that the code above attempts to load each
 	// compiled shader file (.cso) from two different relative paths.
@@ -350,6 +386,37 @@ void Game::Draw(float deltaTime, float totalTime)
 	
 	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP());
 	two->Draw(context);
+
+	// After drawing objects - Draw the sky!
+
+	// Grab the buffers
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+	ID3D11Buffer* skyVB = timmy->GetVertexBuffer();
+	ID3D11Buffer* skyIB = timmy->GetIndexBuffer();
+	context->IASetVertexBuffers(0, 1, &skyVB, &stride, &offset);
+	context->IASetIndexBuffer(skyIB, DXGI_FORMAT_R32_UINT, 0);
+
+	// Set up shaders
+	skyVS->SetMatrix4x4("view", camNewton->GetMatrixV());
+	skyVS->SetMatrix4x4("projection", camNewton->GetMatrixP());
+	skyVS->CopyAllBufferData();
+	skyVS->SetShader();
+
+	skyPS->SetShaderResourceView("Sky", skySRV);
+	skyPS->CopyAllBufferData();
+	skyPS->SetShader();
+
+	// Set the proper render states
+	context->RSSetState(skyRastState);
+	context->OMSetDepthStencilState(skyDepthState, 0);
+
+	// Actually draw
+	context->DrawIndexed(timmy->GetIndexCount(), 0, 0);
+
+	// Reset the states!
+	context->RSSetState(0);
+	context->OMSetDepthStencilState(0, 0);
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it

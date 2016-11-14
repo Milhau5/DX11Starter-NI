@@ -14,12 +14,20 @@ struct VertexToPixel
 	float4 position		: SV_POSITION;
 	float4 worldSpace   : TEXTCOORD1;
 	float3 normal       : NORMAL;
+	//float3 worldPos     : POSITION;
+	//float3 tangent      : TANGENT;
 	float2 uv           : TEXCOORD;
 };
 
 //Globals
 Texture2D diffuseTexture   : register(t0);
 SamplerState basicSampler  : register(s0);
+
+// External texture-related data
+//Texture2D Texture		: register(t0);
+//Texture2D NormalMap		: register(t1);
+//TextureCube Sky			: register(t2);
+//SamplerState Sampler	: register(s0);
 
 //A new directional light
 //we don't need semantics
@@ -40,6 +48,9 @@ cbuffer externalLight : register(b0)
 {
 	DirectionalLight light;
 	DirectionalLight newLight;
+
+	//new additions
+	//float3 CameraPosition;
 };
 
 //we would want to eventually use this instead of making temp values (see main() below)
