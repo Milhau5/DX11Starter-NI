@@ -73,6 +73,12 @@ Game::~Game()
 	skySRV->Release();
 	skyDepthState->Release();
 	skyRastState->Release();
+
+	shadowDSV->Release();
+	shadowSRV->Release();
+	shadowRasterizer->Release();
+	shadowSampler->Release();
+	delete shadowVS;
 }
 
 // --------------------------------------------------------
@@ -81,6 +87,8 @@ Game::~Game()
 // --------------------------------------------------------
 void Game::Init()
 {
+	shadowMapSize = 1024; //good default size
+	
 	camNewton = new Camera();
 
 	camNewton->UpdateProjectionMatrix(width, height); //should be called here
@@ -92,6 +100,11 @@ void Game::Init()
 	secondLight.AmbientColor = XMFLOAT4(0.1f, 0.1f, 0.1f, 1.0f);
 	secondLight.DiffuseColor = XMFLOAT4(1.0f, 0.0f, 0.0f, 1.0f);
 	secondLight.Direction = XMFLOAT3(-1.0f, -1.0f, +0.0f);
+	//
+	/*spotMe.AmbientColor = XMFLOAT4(0.0f, 0.0f, 1.0f, 1.0f);
+	spotMe.Position = XMFLOAT3(1.0f, 0.0f, 0.0f);
+	spotMe.DiffuseIntensity = 2.0f;
+	spotMe.Direction = XMFLOAT3(-1.0f, +0.0f, +0.0f);*/
 
 	// Helper methods for loading shaders, creating some basic
 	// geometry to draw and some simple camera matrices.
@@ -119,6 +132,66 @@ void Game::Init()
 	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 	dsDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL; // Make sure we can see the sky (at max depth)
 	device->CreateDepthStencilState(&dsDesc, &skyDepthState);
+
+	//----------What we need for the shadow----------
+
+	//The texture that will become the shadow map
+	D3D11_TEXTURE2D_DESC shadowDesc = {};
+	shadowDesc.Width = shadowMapSize;
+	shadowDesc.Height = shadowMapSize;
+	shadowDesc.ArraySize = 1;
+	shadowDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+	shadowDesc.CPUAccessFlags = 0;
+	shadowDesc.Format = DXGI_FORMAT_R32_TYPELESS; //check the graphics debugger for this type of object!
+	shadowDesc.MipLevels = 1;
+	shadowDesc.MiscFlags = 0;
+	shadowDesc.SampleDesc.Count = 1;
+	shadowDesc.SampleDesc.Quality = 0;
+	shadowDesc.Usage = D3D11_USAGE_DEFAULT;
+	ID3D11Texture2D* shadowTexture;
+	device->CreateTexture2D(&shadowDesc, 0, &shadowTexture);
+
+	//Depth Stencil View
+	D3D11_DEPTH_STENCIL_VIEW_DESC shadowDSDesc = {};
+	shadowDSDesc.Format = DXGI_FORMAT_D32_FLOAT;
+	shadowDSDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+	shadowDSDesc.Texture2D.MipSlice = 0;
+	device->CreateDepthStencilView(shadowTexture, &shadowDSDesc, &shadowDSV);
+
+	//SRV for the shadow map
+	D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Format = DXGI_FORMAT_R32_FLOAT;
+	srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	device->CreateShaderResourceView(shadowTexture, &srvDesc, &shadowSRV);
+
+	//Now release reference, since we don't need it
+	shadowTexture->Release();
+
+	//A special "comparison" sampler state for shadows
+	//This will compare each pixel to a value to see which pixels are "lit" or "unlit"
+	D3D11_SAMPLER_DESC shadowSampDesc = {};
+	shadowSampDesc.Filter = D3D11_FILTER_COMPARISON_MIN_MAG_MIP_LINEAR; // use LERP for minification, magnification, and mip-level sampling
+	shadowSampDesc.ComparisonFunc = D3D11_COMPARISON_LESS;
+	shadowSampDesc.AddressU = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSampDesc.AddressV = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSampDesc.AddressW = D3D11_TEXTURE_ADDRESS_BORDER;
+	shadowSampDesc.BorderColor[0] = 1.0f;
+	shadowSampDesc.BorderColor[1] = 1.0f;
+	shadowSampDesc.BorderColor[2] = 1.0f;
+	shadowSampDesc.BorderColor[3] = 1.0f;
+	device->CreateSamplerState(&shadowSampDesc, &shadowSampler);
+
+	//Rasterizer state for shadow
+	D3D11_RASTERIZER_DESC shadowRastDesc = {};
+	shadowRastDesc.FillMode = D3D11_FILL_SOLID;
+	shadowRastDesc.CullMode = D3D11_CULL_BACK;
+	shadowRastDesc.DepthClipEnable = true;
+	shadowRastDesc.DepthBias = 1000; // Multiplied by (smallest possible value > 0 in depth buffer) to prevent "shadow acne"
+	shadowRastDesc.DepthBiasClamp = 0.0f;
+	shadowRastDesc.SlopeScaledDepthBias = 1.0f;
+	device->CreateRasterizerState(&shadowRastDesc, &shadowRasterizer);
 
 	// Tell the input assembler stage of the pipeline what kind of
 	// geometric primitives (points, lines or triangles) we want to draw.  
@@ -149,6 +222,10 @@ void Game::LoadShaders()
 	skyPS = new SimplePixelShader(device, context);
 	if (!skyPS->LoadShaderFile(L"Debug/SkyPS.cso"))
 		skyPS->LoadShaderFile(L"SkyPS.cso");
+
+	shadowVS = new SimpleVertexShader(device, context);
+	if (!shadowVS->LoadShaderFile(L"Debug/ShadowVS.cso"))
+		shadowVS->LoadShaderFile(L"ShadowVS.cso");
 
 	// You'll notice that the code above attempts to load each
 	// compiled shader file (.cso) from two different relative paths.
@@ -204,6 +281,23 @@ void Game::CreateMatrices()
 		0.1f,						// Near clip plane distance
 		100.0f);					// Far clip plane distance
 	XMStoreFloat4x4(&projectionMatrix, XMMatrixTranspose(P)); // Transpose for HLSL!
+
+	//----------Shadow-related matrices (for directional lights)----------
+	
+	//for both matrices, we want to see things from the light's POV, as if
+	//the light is a camera
+	
+	//need a "LookTo" view matrix
+	XMMATRIX shView = XMMatrixLookAtLH(
+		XMVectorSet(0, 20, -20, 0),
+		XMVectorSet(0, 0, 0, 0),
+		XMVectorSet(0, 1, 0, 0));
+	XMStoreFloat4x4(&shadowViewMatrix, XMMatrixTranspose(shView));
+
+	//Orthographic projection matrix
+	//For Spot lights, we need a perspective projection matrix (could be XMMatrixPerspectiveLH()), pass in camera's info
+	XMMATRIX shProj = XMMatrixOrthographicLH(10, 10, 0.1f, 100.0f);
+	XMStoreFloat4x4(&shadowProjectionMatrix, XMMatrixTranspose(shProj));
 }
 
 
@@ -340,10 +434,64 @@ void Game::Update(float deltaTime, float totalTime)
 }
 
 // --------------------------------------------------------
+// The method that will actually render the shadow map
+// --------------------------------------------------------
+void Game::RenderShadowMap()
+{
+	// Set up targets
+	context->OMSetRenderTargets(0, 0, shadowDSV);
+	context->ClearDepthStencilView(shadowDSV, D3D11_CLEAR_DEPTH, 1.0f, 0);
+	context->RSSetState(shadowRasterizer);
+
+	// Make a viewport to match the render target size
+	D3D11_VIEWPORT viewport = {};
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = (float)shadowMapSize;
+	viewport.Height = (float)shadowMapSize;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
+	context->RSSetViewports(1, &viewport);
+
+	// Set up our shadow VS shader
+	shadowVS->SetShader();
+	shadowVS->SetMatrix4x4("view", shadowViewMatrix);
+	shadowVS->SetMatrix4x4("projection", shadowProjectionMatrix);
+
+	// Turn off pixel shader
+	context->PSSetShader(0, 0, 0);
+
+	// Grab the data from the first entity's mesh
+	one->DrawWithShadow(context);
+	shadowVS->SetMatrix4x4("world", one->GetMatrix());
+	shadowVS->CopyAllBufferData();
+	// Finally do the actual drawing
+	context->DrawIndexed(one->GetMesh()->GetIndexCount(), 0, 0);
+
+	// Grab the data from the second entity's mesh
+	two->DrawWithShadow(context);
+	shadowVS->SetMatrix4x4("world", two->GetMatrix());
+	shadowVS->CopyAllBufferData();
+	// Finally do the actual drawing
+	context->DrawIndexed(two->GetMesh()->GetIndexCount(), 0, 0);
+	
+
+	// Change everything back
+	context->OMSetRenderTargets(1, &backBufferRTV, depthStencilView);
+	viewport.Width = (float)width;
+	viewport.Height = (float)height;
+	context->RSSetViewports(1, &viewport);
+	context->RSSetState(0);
+}
+
+// --------------------------------------------------------
 // Clear the screen, redraw everything, present to the user
 // --------------------------------------------------------
-void Game::Draw(float deltaTime, float totalTime)
+void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow code
 {
+	//Shadows
+	RenderShadowMap();
+	
 	// Background color (Cornflower Blue in this case) for clearing
 	const float color[4] = {0.4f, 0.6f, 0.75f, 0.0f};
 
@@ -369,22 +517,25 @@ void Game::Draw(float deltaTime, float totalTime)
 		sizeof(DirectionalLight)
 	);
 
+	/*pixelShader->SetData(
+		"spotLight",
+		&spotMe, //same as above?
+		sizeof(SpotLight)
+	);*/
+
+	//new
+	pixelShader->SetShaderResourceView("ShadowMap", shadowSRV);
+	pixelShader->SetSamplerState("ShadowSampler", shadowSampler);
+
 	pixelShader->CopyAllBufferData();
 	pixelShader->SetShader();
 	
-	one->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP());
+	one->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	one->Draw(context);
 
-	/*pixelShader->SetData(
-		"light",
-		&dLightful, //same as above?
-		sizeof(DirectionalLight)
-	);
-
-	pixelShader->CopyAllBufferData();
-	pixelShader->SetShader();*/
+    //
 	
-	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP());
+	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	two->Draw(context);
 
 	// After drawing objects - Draw the sky!
@@ -407,6 +558,10 @@ void Game::Draw(float deltaTime, float totalTime)
 	skyPS->CopyAllBufferData();
 	skyPS->SetShader();
 
+	//Shadow matrices, DO NOT NEED THIS CODE
+	//vertexShader->SetMatrix4x4("shadowView", shadowViewMatrix);
+	//vertexShader->SetMatrix4x4("shadowProjection", shadowProjectionMatrix);
+
 	// Set the proper render states
 	context->RSSetState(skyRastState);
 	context->OMSetDepthStencilState(skyDepthState, 0);
@@ -414,9 +569,10 @@ void Game::Draw(float deltaTime, float totalTime)
 	// Actually draw
 	context->DrawIndexed(timmy->GetIndexCount(), 0, 0);
 
-	// Reset the states!
+	// Reset the states! Supposedly this piece of code was missing...but here it is, in the right place
 	context->RSSetState(0);
 	context->OMSetDepthStencilState(0, 0);
+	pixelShader->SetShaderResourceView("ShadowMap", 0); //new
 
 	// Present the back buffer to the user
 	//  - Puts the final frame we're drawing into the window so the user can see it

@@ -22,6 +22,7 @@ public:
 	void Init();
 	void OnResize();
 	void Update(float deltaTime, float totalTime);
+	void RenderShadowMap();
 	void Draw(float deltaTime, float totalTime);
 
 	// Overridden mouse input helper methods
@@ -66,6 +67,7 @@ private:
 	//Light(s)
 	DirectionalLight dLightful;
 	DirectionalLight secondLight;
+	//SpotLight spotMe;
 
 	// Wrappers for DirectX shaders to provide simplified functionality
 	SimpleVertexShader* vertexShader;
@@ -73,6 +75,16 @@ private:
 
 	SimpleVertexShader* skyVS;
 	SimplePixelShader* skyPS;
+
+	//Things we will need for the Shadow Map
+	int shadowMapSize;
+	ID3D11DepthStencilView* shadowDSV;
+	ID3D11ShaderResourceView* shadowSRV;
+	ID3D11SamplerState* shadowSampler;
+	ID3D11RasterizerState* shadowRasterizer;
+	SimpleVertexShader* shadowVS;
+	DirectX::XMFLOAT4X4 shadowViewMatrix;
+	DirectX::XMFLOAT4X4 shadowProjectionMatrix;
 
 	// The matrices to go from model space to screen space
 	DirectX::XMFLOAT4X4 worldMatrix;

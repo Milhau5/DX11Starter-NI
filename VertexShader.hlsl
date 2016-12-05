@@ -10,6 +10,9 @@ cbuffer externalData : register(b0)
 	matrix world;
 	matrix view;
 	matrix projection;
+
+	matrix shadowView;
+	matrix shadowProjection;
 };
 
 // Struct representing a single vertex worth of data
@@ -26,7 +29,7 @@ struct VertexShaderInput
 	//  v    v                v
 	float3 position		: POSITION;     // XYZ position
 	float3 normal       : NORMAL;
-	float2 uv           : TEXTCOORD;
+	float2 uv           : TEXCOORD;
 	//float3 tangent      : TANGENT;
 };
 
@@ -42,11 +45,12 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
+	float4 posForShadow : TEXCOORD1;
+	//may need a "dirForShadow" for Spot Light
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
-	float4 worldSpace   : TEXTCOORD1; //fog
+	//float4 worldSpace   : TEXCOORD1; //fog
 	float3 normal       : NORMAL;
-	//float3 worldPos     : POSITION; //sky
-	//float3 tangent      : TANGENT;
+	//float4 worldPos     : POSITION; //may be better than worldSpace someday. REMEMBER TO CHANGE BACK TO FLOAT3 later
 	float2 uv           : TEXCOORD;
 };
 
@@ -71,7 +75,7 @@ VertexToPixel main( VertexShaderInput input )
 	// all of those transformations (world to view to projection space)
 	matrix worldViewProj = mul(mul(world, view), projection);
 
-	output.worldSpace = mul(float4(input.position, 1.0f), mul(world, view)); //this is the only line changed in the math
+	//output.worldSpace = mul(float4(input.position, 1.0f), mul(world, view)); //this is the only line changed in the math
 
 	// Then we convert our 3-component position vector to a 4-component vector
 	// and multiply it by our final 4x4 matrix.
@@ -87,10 +91,14 @@ VertexToPixel main( VertexShaderInput input )
 	//output.tangent = mul(input.tangent, (float3x3)world); // Needed for normal mapping
 
     // Get world position of vertex
-	//output.worldPos = mul(float4(input.position, 1.0f), world).xyz;
+	//output.worldPos = mul(float4(input.position, 1.0f), world); //used to end with.xyz
 
 	//UVs
 	output.uv = input.uv;
+
+	// Do shadow map calc
+	matrix shadowWVP = mul(mul(world, shadowView), shadowProjection);
+	output.posForShadow = mul(float4(input.position, 1), shadowWVP);
 
 	// Whatever we return will make its way through the pipeline to the
 	// next programmable stage we're using (the pixel shader for now)

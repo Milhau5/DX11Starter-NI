@@ -24,9 +24,13 @@ public:
 
 	void Move();
 
-	void PrepareMaterial(DirectX::XMFLOAT4X4 viewMatrix, DirectX::XMFLOAT4X4 projMatrix);
+	//try this, now with shadows
+	void PrepareMaterial(DirectX::XMFLOAT4X4 viewMatrix, DirectX::XMFLOAT4X4 projMatrix, DirectX::XMFLOAT4X4 shadowView, DirectX::XMFLOAT4X4 shadowProj);
 	
 	void Draw(ID3D11DeviceContext *context); //this will probably be the hardest part
+	void DrawWithShadow(ID3D11DeviceContext *context); //this will probably be the hardest part
+
+	Mesh * GetMesh();
 	
 	~Entity();
 private:

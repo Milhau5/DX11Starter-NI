@@ -73,7 +73,7 @@ void Entity::Move()
 		XMMatrixTranspose(zaWarudo));
 }
 
-void Entity::PrepareMaterial(XMFLOAT4X4 viewMatrix, XMFLOAT4X4 projMatrix)
+void Entity::PrepareMaterial(XMFLOAT4X4 viewMatrix, XMFLOAT4X4 projMatrix, XMFLOAT4X4 shadowView, XMFLOAT4X4 shadowProj)
 {
 	SimpleVertexShader* v = girlInAMaterialWorld->GetVertexShader();
 	SimplePixelShader* p = girlInAMaterialWorld->GetPixelShader();
@@ -86,6 +86,9 @@ void Entity::PrepareMaterial(XMFLOAT4X4 viewMatrix, XMFLOAT4X4 projMatrix)
 	v->SetMatrix4x4("world", GetMatrix());
 	v->SetMatrix4x4("view", viewMatrix); //NOW camera's view matrix
 	v->SetMatrix4x4("projection", projMatrix);
+	
+	v->SetMatrix4x4("shadowView", shadowView);
+	v->SetMatrix4x4("shadowProjection", shadowProj);
 
 	// Once you've set all of the data you care to change for
 	// the next draw call, you need to actually send it to the GPU
@@ -105,7 +108,7 @@ void Entity::Draw(ID3D11DeviceContext *context) //may take camera matrices in la
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
 	ID3D11Buffer * temp = meshingAround->GetVertexBuffer();
-	context->IASetVertexBuffers(0, 1, &temp, &stride, &offset); //PROBLEM ON THIS LINE
+	context->IASetVertexBuffers(0, 1, &temp, &stride, &offset);
 	context->IASetIndexBuffer(meshingAround->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
 
 	// Finally do the actual drawing
@@ -117,6 +120,22 @@ void Entity::Draw(ID3D11DeviceContext *context) //may take camera matrices in la
 		meshingAround->GetIndexCount(),     // The number of indices to use (we could draw a subset if we wanted)
 		0,     // Offset to the first index we want to use
 		0);    // Offset to add to each index when looking up vertices
+}
+
+//Shadow will actually be added in Game.cpp
+//we just need some slight restructuring here
+void Entity::DrawWithShadow(ID3D11DeviceContext *context)
+{
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+	ID3D11Buffer * temp = meshingAround->GetVertexBuffer();
+	context->IASetVertexBuffers(0, 1, &temp, &stride, &offset);
+	context->IASetIndexBuffer(meshingAround->GetIndexBuffer(), DXGI_FORMAT_R32_UINT, 0);
+}
+
+Mesh * Entity::GetMesh()
+{
+	return meshingAround;
 }
 
 Entity::~Entity()

@@ -11,23 +11,20 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
+	float4 posForShadow : TEXCOORD1;
 	float4 position		: SV_POSITION;
-	float4 worldSpace   : TEXTCOORD1;
+	//float4 worldSpace   : TEXCOORD1;
 	float3 normal       : NORMAL;
-	//float3 worldPos     : POSITION;
-	//float3 tangent      : TANGENT;
+	//float4 worldPos     : POSITION;
 	float2 uv           : TEXCOORD;
 };
 
 //Globals
-Texture2D diffuseTexture   : register(t0);
+TextureCube Sky            : register(t0);
+Texture2D diffuseTexture   : register(t1);
+Texture2D ShadowMap        : register(t2);
 SamplerState basicSampler  : register(s0);
-
-// External texture-related data
-//Texture2D Texture		: register(t0);
-//Texture2D NormalMap		: register(t1);
-//TextureCube Sky			: register(t2);
-//SamplerState Sampler	: register(s0);
+SamplerComparisonState ShadowSampler  : register(s1);
 
 //A new directional light
 //we don't need semantics
@@ -36,7 +33,19 @@ struct DirectionalLight
 	float4 AmbientColor;
 	float4 DiffuseColor;
 	float3 Direction;
+	//float nope;
 };
+
+//NEW light that needs its own shadowing
+/*struct SpotLight
+{
+	float4 AmbientColor;
+	float4 DiffuseColor;
+	float3 Position;
+	float DiffuseIntensity;
+	float3 Direction;
+	float nope;
+};*/
 
 // Constant Buffer
 // - Allows us to define a buffer of individual variables 
@@ -48,9 +57,10 @@ cbuffer externalLight : register(b0)
 {
 	DirectionalLight light;
 	DirectionalLight newLight;
+	//SpotLight spotLight;
 
 	//new additions
-	//float3 CameraPosition;
+	float3 CameraPosition;
 };
 
 //we would want to eventually use this instead of making temp values (see main() below)
@@ -70,6 +80,42 @@ cbuffer externalLight : register(b0)
 	return clamp((d - FogStart) / (FogEnd - FogStart), 0, 1) * FogEnabled;
 }*/
 
+//Nice read!
+//http://gamedev.stackexchange.com/questions/56897/glsl-light-attenuation-color-and-intensity-formula
+/*float4 calcSpotLight(float4 worldPos, float3 normal, SpotLight spotLight)
+{
+	//multiply attenuation by intensity
+	//attenuation function: 1.0 / (1.0 + a*dist + b*dist*dist))
+	//float a = 5;
+	//float b = 4;
+
+	float3 spotLightDirectionToPixel = worldPos - spotLight.Position;
+	//float dist = sqrt(dot(pointLightDirection, pointLightDirection));
+	//dist = max(dist, 9);
+	//float attenuation = 1.0 / (1.0 + a*dist + b*dist*dist);
+	spotLightDirectionToPixel = -normalize(spotLightDirectionToPixel);
+
+	//float temp = attenuation * pointLight.Intensity;
+
+	//N dot L
+	float lightAmount = dot(normal, spotLightDirectionToPixel);
+	lightAmount = saturate(lightAmount);
+
+	//why 
+	float angleFromCenter = max(0.5f, dot(spotLightDirectionToPixel, spotLight.Direction));
+	//raise to a power for a nice "falloff"
+	//multiply diffuse and specular results by this
+	float spotAmount = pow(angleFromCenter, 0.7f);
+	//float spotAmount = smoothstep(100.0f, 100.0f, angleFromCenter);
+	//float spotAmount = 1.0f;
+
+	float4 scaledDiffuse = spotLight.DiffuseColor * lightAmount * spotAmount;
+
+
+	//return float4(spotAmount, 0, 0, 0);
+	return scaledDiffuse + spotLight.AmbientColor;
+}*/
+
 // --------------------------------------------------------
 // The entry point (main method) for our pixel shader
 // 
@@ -85,7 +131,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	input.normal = updated;
 
 	//fog-related stuff
-	float dist = 0;
+	/*float dist = 0;
 	float fogFactor = 0;
 	float4 fogColor = float4(0.5, 0.5, 0.5, 1.0); //grey
 
@@ -94,10 +140,13 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	//linear fog
 	fogFactor = (10 - dist) / (10 - 5);
-	fogFactor = clamp(fogFactor, 0.0, 1.0);
+	fogFactor = clamp(fogFactor, 0.0, 1.0);*/
 
 	//sample the texture
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler, input.uv);
+
+	//NEW
+	//float4 spotL = calcSpotLight(input.worldPos, input.normal, spotLight);
 
 	//Normalized direction TO the light
 	float3 goTowardsTheLight = -normalize(light.Direction);
@@ -113,10 +162,25 @@ float4 main(VertexToPixel input) : SV_TARGET
 	//Return final surface color
 	float4 nextResult = (newLight.DiffuseColor * amount * surfaceColor) + (newLight.AmbientColor * surfaceColor);
 
+	// Shadow map calculation
+	// Figure out this pixel's UV in the SHADOW MAP
+	float2 shadowUV = input.posForShadow.xy / input.posForShadow.w * 0.5f + 0.5f;
+	shadowUV.y = 1.0f - shadowUV.y; // Flip the Y since UV coords and screen coords are different
+
+	// Calculate this pixel's actual depth from the light
+	float depthFromLight = input.posForShadow.z / input.posForShadow.w;
+
+	// Sample the shadow map
+	float shadowAmount = ShadowMap.SampleCmpLevelZero(ShadowSampler, shadowUV, depthFromLight);
+
 	//return finalResult + nextResult;
 	float4 tempResult = finalResult + nextResult;
 
-	float4 finalColor = lerp(fogColor, tempResult, fogFactor);
-	return finalColor;
+	//float4 finalColor = lerp(fogColor, tempResult, fogFactor);
+	//return finalColor;
+	
+	return tempResult * shadowAmount;
+
+	//return spotL;
 	
 }
