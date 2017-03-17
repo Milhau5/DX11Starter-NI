@@ -11,12 +11,12 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
-	float4 posForShadow : TEXCOORD1;
+	float4 posForShadow : TEXCOORD0;
 	float4 position		: SV_POSITION;
-	//float4 worldSpace   : TEXCOORD1;
+	float4 worldSpace   : TEXCOORD1;
 	float3 normal       : NORMAL;
 	//float4 worldPos     : POSITION;
-	float2 uv           : TEXCOORD;
+	float2 uv           : TEXCOORD2;
 };
 
 //Globals
@@ -131,7 +131,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 	input.normal = updated;
 
 	//fog-related stuff
-	/*float dist = 0;
+	float dist = 0;
 	float fogFactor = 0;
 	float4 fogColor = float4(0.5, 0.5, 0.5, 1.0); //grey
 
@@ -140,7 +140,7 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	//linear fog
 	fogFactor = (10 - dist) / (10 - 5);
-	fogFactor = clamp(fogFactor, 0.0, 1.0);*/
+	fogFactor = clamp(fogFactor, 0.0, 1.0);
 
 	//sample the texture
 	float4 surfaceColor = diffuseTexture.Sample(basicSampler, input.uv);
@@ -175,11 +175,10 @@ float4 main(VertexToPixel input) : SV_TARGET
 
 	//return finalResult + nextResult;
 	float4 tempResult = finalResult + nextResult;
+	float4 myAss = tempResult * shadowAmount;
 
-	//float4 finalColor = lerp(fogColor, tempResult, fogFactor);
-	//return finalColor;
-	
-	return tempResult * shadowAmount;
+	float4 finalColor = lerp(fogColor, myAss, fogFactor);
+	return finalColor;
 
 	//return spotL;
 	

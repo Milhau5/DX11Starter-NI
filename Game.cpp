@@ -78,6 +78,7 @@ Game::~Game()
 	shadowSRV->Release();
 	shadowRasterizer->Release();
 	shadowSampler->Release();
+	blendState->Release();
 	delete shadowVS;
 }
 
@@ -132,6 +133,21 @@ void Game::Init()
 	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 	dsDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL; // Make sure we can see the sky (at max depth)
 	device->CreateDepthStencilState(&dsDesc, &skyDepthState);
+
+	//create description of blend state here (move code if necessary)
+	//blend so as to create transparency on desired object
+	D3D11_BLEND_DESC bd = {};
+	bd.AlphaToCoverageEnable = false;
+	bd.IndependentBlendEnable = false;
+	bd.RenderTarget[0].BlendEnable = true; //we might change it to [1] to get the second object
+	bd.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA; //how to interpret source pixel color, src is NEW color. Option: mode by own alpha val
+	bd.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA; //destination pixel color, already in render target. Option: mod by (1.0-Src pixel alpha)
+	bd.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD; //operation: add
+	bd.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	bd.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+	bd.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	device->CreateBlendState(&bd, &blendState);
 
 	//----------What we need for the shadow----------
 
@@ -504,6 +520,17 @@ void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow 
 		D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
 		1.0f,
 		0);
+
+	// Set up render states
+	//context->RSSetState(rsNoCull);
+
+	//OMSetBlendState parameters: blend state, array of blend factors (one for each RGBA component), default 32-bit sample coverage
+	//Right now: only bottom face blends with Cornflower blue background (not the skybox)
+	float factors[4] = { 1,1,1,1 };
+	context->OMSetBlendState(
+		blendState,
+		factors,
+		0xFFFFFFFF);
 
 	pixelShader->SetData(
 		"light",

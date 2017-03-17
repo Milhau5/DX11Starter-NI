@@ -45,13 +45,13 @@ struct VertexToPixel
 	//  |   Name          Semantic
 	//  |    |                |
 	//  v    v                v
-	float4 posForShadow : TEXCOORD1;
+	float4 posForShadow : TEXCOORD0;
 	//may need a "dirForShadow" for Spot Light
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
-	//float4 worldSpace   : TEXCOORD1; //fog
+	float4 worldSpace   : TEXCOORD1; //fog
 	float3 normal       : NORMAL;
 	//float4 worldPos     : POSITION; //may be better than worldSpace someday. REMEMBER TO CHANGE BACK TO FLOAT3 later
-	float2 uv           : TEXCOORD;
+	float2 uv           : TEXCOORD2;
 };
 
 // --------------------------------------------------------
@@ -75,7 +75,7 @@ VertexToPixel main( VertexShaderInput input )
 	// all of those transformations (world to view to projection space)
 	matrix worldViewProj = mul(mul(world, view), projection);
 
-	//output.worldSpace = mul(float4(input.position, 1.0f), mul(world, view)); //this is the only line changed in the math
+	output.worldSpace = mul(float4(input.position, 1.0f), mul(world, view)); //this is the only line changed in the math
 
 	// Then we convert our 3-component position vector to a 4-component vector
 	// and multiply it by our final 4x4 matrix.
