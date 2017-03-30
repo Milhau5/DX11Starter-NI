@@ -78,6 +78,7 @@ Game::~Game()
 	shadowSRV->Release();
 	shadowRasterizer->Release();
 	shadowSampler->Release();
+	rsNoCull->Release();
 	blendState->Release();
 	delete shadowVS;
 }
@@ -133,6 +134,13 @@ void Game::Init()
 	dsDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
 	dsDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL; // Make sure we can see the sky (at max depth)
 	device->CreateDepthStencilState(&dsDesc, &skyDepthState);
+
+	// Set up a rasterizer state with no culling
+	D3D11_RASTERIZER_DESC rd = {};
+	rd.CullMode = D3D11_CULL_NONE;
+	rd.FillMode = D3D11_FILL_SOLID;
+	rd.DepthClipEnable = true;
+	device->CreateRasterizerState(&rd, &rsNoCull);
 
 	//create description of blend state here (move code if necessary)
 	//blend so as to create transparency on desired object
@@ -522,8 +530,8 @@ void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow 
 		0);
 
 	// Set up render states
-	//context->RSSetState(rsNoCull);
-
+	context->RSSetState(rsNoCull);
+	
 	//OMSetBlendState parameters: blend state, array of blend factors (one for each RGBA component), default 32-bit sample coverage
 	//Right now: only bottom face blends with Cornflower blue background (not the skybox)
 	float factors[4] = { 1,1,1,1 };
@@ -557,11 +565,16 @@ void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow 
 	pixelShader->CopyAllBufferData();
 	pixelShader->SetShader();
 	
+	//This shouldn't work, but lets try
+	vertexShader->CopyAllBufferData();
 	one->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	one->Draw(context);
 
     //
 	
+	//This shouldn't work, but lets try
+	vertexShader->CopyAllBufferData();
+	pixelShader->CopyAllBufferData();
 	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	two->Draw(context);
 

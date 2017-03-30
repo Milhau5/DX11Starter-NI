@@ -50,6 +50,7 @@ struct VertexToPixel
 	float4 position		: SV_POSITION;	// XYZW position (System Value Position)
 	float4 worldSpace   : TEXCOORD1; //fog
 	float3 normal       : NORMAL;
+	float3 positionWS   : POSITION; //the world position as a float3
 	//float4 worldPos     : POSITION; //may be better than worldSpace someday. REMEMBER TO CHANGE BACK TO FLOAT3 later
 	float2 uv           : TEXCOORD2;
 };
@@ -74,6 +75,7 @@ VertexToPixel main( VertexShaderInput input )
 	// First we multiply them together to get a single matrix which represents
 	// all of those transformations (world to view to projection space)
 	matrix worldViewProj = mul(mul(world, view), projection);
+	float4 worldPositionTemp = mul(input.position, world); //lets just take this part
 
 	output.worldSpace = mul(float4(input.position, 1.0f), mul(world, view)); //this is the only line changed in the math
 
@@ -86,6 +88,7 @@ VertexToPixel main( VertexShaderInput input )
 
 	//useful for us (now) because shapes are on a uniform scale
 	output.normal = mul(input.normal, (float3x3)world);
+	output.positionWS = worldPositionTemp.xyz; //this is going into the Cook-Torrence Microfacet BRDF
 
 	//tan
 	//output.tangent = mul(input.tangent, (float3x3)world); // Needed for normal mapping

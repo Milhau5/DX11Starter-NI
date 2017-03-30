@@ -1,3 +1,4 @@
+#include "CommonVars.hlsl"
 
 // Struct representing the data we expect to receive from earlier pipeline stages
 // - Should match the output of our corresponding vertex shader
@@ -15,6 +16,7 @@ struct VertexToPixel
 	float4 position		: SV_POSITION;
 	float4 worldSpace   : TEXCOORD1;
 	float3 normal       : NORMAL;
+	float3 positionWS   : POSITION;
 	//float4 worldPos     : POSITION;
 	float2 uv           : TEXCOORD2;
 };
@@ -62,6 +64,74 @@ cbuffer externalLight : register(b0)
 	//new additions
 	float3 CameraPosition;
 };
+
+cbuffer perFrameData : register(b1)
+{
+	float3 cameraPos;
+	float metalness;
+	float roughness;
+};
+
+// Lambertian Reflectance BRDF
+// http://en.wikipedia.org/wiki/Lambertian_reflectance
+float3 DirectDiffuseBRDF(float3 diffuseAlbedo, float nDotL)
+{
+	return (diffuseAlbedo * nDotL) / Pi;
+}
+
+//Cook-Torrence Microfacet BRDF, where all the functions from CommonVars come together (FIX LATER)
+//------------------------------------------------------------------------------------------------
+//f = D * F * G / (4 * (N.L) * (N.V))
+// 
+//D = Normal Distribution
+//F = Fresnel
+//G = Geometry Term
+//
+//------------------------------------------------------------------------------------------------
+float3 DirectSpecularBRDF(float3 specularAlbedo, float3 positionWS, float3 normal, float3 lightDir)
+{
+	float3 viewDir = normalize(CameraPos - positionWS);
+	float3 halfVec = normalize(viewDir + lightDir);
+
+	float nDotH = saturate(dot(normal, halfVec));
+	float nDotL = saturate(dot(normal, lightDir));
+	float nDotV = max(dot(normal, viewDir), 0.0001f);
+
+	float alpha2 = roughness * roughness;
+
+	// Computes the distribution of the microfacets for the shaded surface.
+	// Trowbridge-Reitz/GGX normal distribution function.
+	float  D = alpha2 / (Pi * pow(nDotH * nDotH * (alpha2 - 1) + 1, 2.0f));
+
+	// Computes the amount of light that reflects from a mirror surface given its index of refraction. 
+	// Schlick's approximation.
+	float3 F = Schlick_Fresnel(specularAlbedo, halfVec, lightDir);
+
+	// Computes the shadowing from the microfacets.
+	// Smith's approximation.
+	float  G = G_Smith(roughness, nDotV, nDotL);
+
+	return D * F * G; //later to be divide by 4(nDotL)(nDotV)
+}
+
+//Calculates direct lighting for a single directional light source.
+float3 DirectLighting(float3 normal, float3 lightColor, float3 lightPos, float3 diffuseAlbedo, float3 specularAlbedo, float3 positionWS)
+{
+	float3 lighting = 0.0f;
+
+	float3 pixelToLight = lightPos - positionWS;
+	float  lightDist = length(pixelToLight);
+	float3 lightDir = pixelToLight / lightDist; //light's Direction
+
+	float nDotL = saturate(dot(normal, lightDir));
+
+	if (nDotL > 0.0f)
+	{
+		lighting = DirectDiffuseBRDF(diffuseAlbedo, nDotL) + DirectSpecularBRDF(specularAlbedo, positionWS, normal, lightDir);
+	}
+
+	return max(lighting, 0.0f) * lightColor;
+}
 
 //we would want to eventually use this instead of making temp values (see main() below)
 /*cbuffer fogVariables : register(c0)

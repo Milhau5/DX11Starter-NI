@@ -84,6 +84,7 @@ private:
 	ID3D11ShaderResourceView* shadowSRV;
 	ID3D11SamplerState* shadowSampler;
 	ID3D11RasterizerState* shadowRasterizer;
+	ID3D11RasterizerState* rsNoCull;
 	ID3D11BlendState* blendState; //will help with transparency
 	SimpleVertexShader* shadowVS;
 	DirectX::XMFLOAT4X4 shadowViewMatrix;
