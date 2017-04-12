@@ -25,6 +25,9 @@ struct VertexToPixel
 TextureCube Sky            : register(t0);
 Texture2D diffuseTexture   : register(t1);
 Texture2D ShadowMap        : register(t2);
+TextureCube IrradianceMap  : register(t3);
+TextureCube RadianceMap    : register(t4); //the PMREM that will be generated in code
+Texture2D IntegrationMap   : register(t5); //2D LUT used to integrate any BRDF with the PMREM
 SamplerState basicSampler  : register(s0);
 SamplerComparisonState ShadowSampler  : register(s1);
 
@@ -114,6 +117,21 @@ float3 DirectSpecularBRDF(float3 specularAlbedo, float3 positionWS, float3 norma
 	return D * F * G; //later to be divide by 4(nDotL)(nDotV)
 }
 
+// ================================================================================================
+// Split sum approximation of indirect specular lighting using a pre-filtered mip-mapped
+// radiance environment map and BRDF integration map.
+// ================================================================================================
+float3 ApproximateSpecularIBL(float3 specularAlbedo, float3 reflectDir, float nDotV)
+{
+	// Mip level is in [0, 6] range and roughness is [0, 1].
+	float mipIndex = roughness * 6;
+
+	float3 prefilteredColor = radianceMap.SampleLevel(SamplerAnisotropic, reflectDir, mipIndex);
+	float3 environmentBRDF = integrationMap.Sample(SamplerAnisotropic, float2(roughness, nDotV));
+
+	return prefilteredColor * (specularAlbedo * environmentBRDF.x + environmentBRDF.y);
+}
+
 //Calculates direct lighting for a single directional light source.
 float3 DirectLighting(float3 normal, float3 lightColor, float3 lightPos, float3 diffuseAlbedo, float3 specularAlbedo, float3 positionWS)
 {
@@ -131,6 +149,23 @@ float3 DirectLighting(float3 normal, float3 lightColor, float3 lightPos, float3 
 	}
 
 	return max(lighting, 0.0f) * lightColor;
+}
+
+// ================================================================================================
+// Calculates indirect lighting using a irradiance map and PMREM.
+// ================================================================================================
+float3 IndirectLighting(float roughness, float3 diffuseAlbedo, float3 specularAlbedo, float3 normalWS, float3 positionWS)
+{
+	float3 viewDir = normalize(cameraPos - positionWS);
+	float3 reflectDir = normalize(reflect(-viewDir, normalWS));
+	float nDotV = max(dot(normalWS, viewDir), 0.0001f);
+
+	// Sample the indirect diffuse lighting from the irradiance environment map. 
+	float3 indirectDiffuseLighting = irradianceMap.SampleLevel(SamplerAnisotropic, normalWS, 0) * diffuseAlbedo;
+	// Split sum approximation of specular lighting.
+	float3 indirectSpecularLighting = ApproximateSpecularIBL(specularAlbedo, reflectDir, nDotV);
+
+	return indirectDiffuseLighting + indirectSpecularLighting;
 }
 
 //we would want to eventually use this instead of making temp values (see main() below)
