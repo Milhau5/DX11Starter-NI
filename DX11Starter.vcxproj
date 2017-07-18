@@ -123,6 +123,8 @@
     <ClCompile Include="DXCore.cpp" />
     <ClCompile Include="Entity.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="IBLCubemap.cpp" />
+    <ClCompile Include="IBLCubemapFace.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="Mesh.cpp" />
@@ -133,6 +135,8 @@
     <ClInclude Include="DXCore.h" />
     <ClInclude Include="Entity.h" />
     <ClInclude Include="Game.h" />
+    <ClInclude Include="IBLCubemap.h" />
+    <ClInclude Include="IBLCubemapFace.h" />
     <ClInclude Include="Lights.h" />
     <ClInclude Include="Material.h" />
     <ClInclude Include="Mesh.h" />

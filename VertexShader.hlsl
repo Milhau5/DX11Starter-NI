@@ -107,11 +107,3 @@ VertexToPixel main( VertexShaderInput input )
 	// next programmable stage we're using (the pixel shader for now)
 	return output;
 }
-
-/*
- First article on (linear) fog: http://www.rastertek.com/dx11tut23.html
- Second article: http://in2gpu.com/2014/07/22/create-fog-shader/
- Third (may not help, because it's in XNA): http://gamedev.stackexchange.com/questions/82203/how-add-fog-with-pixel-shader-hlsl-xna
- For the second, remember a PixelShader in DX11 is same as Fragment Shader in OpenGL
- Both use the same equations, princicples, and variables
-*/

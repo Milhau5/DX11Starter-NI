@@ -24,6 +24,11 @@ private:
 	ID3D11Buffer* vertexBuffer;
 	ID3D11Buffer* indexBuffer;
 
+	//some new things for Image-Based Lighting
+	ID3D11ShaderResourceView* irradianceCubeMap;
+	float metalness;
+	float roughness;
+
 	int howManyIndices;
 };
 

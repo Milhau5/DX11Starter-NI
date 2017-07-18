@@ -529,17 +529,6 @@ void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow 
 		1.0f,
 		0);
 
-	// Set up render states
-	context->RSSetState(rsNoCull);
-	
-	//OMSetBlendState parameters: blend state, array of blend factors (one for each RGBA component), default 32-bit sample coverage
-	//Right now: only bottom face blends with Cornflower blue background (not the skybox)
-	float factors[4] = { 1,1,1,1 };
-	context->OMSetBlendState(
-		blendState,
-		factors,
-		0xFFFFFFFF);
-
 	pixelShader->SetData(
 		"light",
 		&dLightful, //same as above?
@@ -565,16 +554,11 @@ void Game::Draw(float deltaTime, float totalTime) //later, uncomment the shadow 
 	pixelShader->CopyAllBufferData();
 	pixelShader->SetShader();
 	
-	//This shouldn't work, but lets try
-	vertexShader->CopyAllBufferData();
 	one->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	one->Draw(context);
 
     //
 	
-	//This shouldn't work, but lets try
-	vertexShader->CopyAllBufferData();
-	pixelShader->CopyAllBufferData();
 	two->PrepareMaterial(camNewton->GetMatrixV(), camNewton->GetMatrixP(), shadowViewMatrix, shadowProjectionMatrix);
 	two->Draw(context);
 

@@ -1,4 +1,4 @@
-#include "CommonVars.hlsl"
+//#include "CommonVars.hlsl"
 
 // Struct representing the data we expect to receive from earlier pipeline stages
 // - Should match the output of our corresponding vertex shader
@@ -25,9 +25,9 @@ struct VertexToPixel
 TextureCube Sky            : register(t0);
 Texture2D diffuseTexture   : register(t1);
 Texture2D ShadowMap        : register(t2);
-TextureCube IrradianceMap  : register(t3);
-TextureCube RadianceMap    : register(t4); //the PMREM that will be generated in code
-Texture2D IntegrationMap   : register(t5); //2D LUT used to integrate any BRDF with the PMREM
+//TextureCube IrradianceMap  : register(t3);
+//TextureCube RadianceMap    : register(t4); //the PMREM that will be generated in code
+//Texture2D IntegrationMap   : register(t5); //2D LUT used to integrate any BRDF with the PMREM
 SamplerState basicSampler  : register(s0);
 SamplerComparisonState ShadowSampler  : register(s1);
 
@@ -65,19 +65,19 @@ cbuffer externalLight : register(b0)
 	//SpotLight spotLight;
 
 	//new additions
-	float3 CameraPosition;
+	//float3 CameraPosition;
 };
 
-cbuffer perFrameData : register(b1)
+/*cbuffer perFrameData : register(b1)
 {
 	float3 cameraPos;
 	float metalness;
 	float roughness;
-};
+};*/
 
 // Lambertian Reflectance BRDF
 // http://en.wikipedia.org/wiki/Lambertian_reflectance
-float3 DirectDiffuseBRDF(float3 diffuseAlbedo, float nDotL)
+/*float3 DirectDiffuseBRDF(float3 diffuseAlbedo, float nDotL)
 {
 	return (diffuseAlbedo * nDotL) / Pi;
 }
@@ -166,24 +166,8 @@ float3 IndirectLighting(float roughness, float3 diffuseAlbedo, float3 specularAl
 	float3 indirectSpecularLighting = ApproximateSpecularIBL(specularAlbedo, reflectDir, nDotV);
 
 	return indirectDiffuseLighting + indirectSpecularLighting;
-}
-
-//we would want to eventually use this instead of making temp values (see main() below)
-/*cbuffer fogVariables : register(c0)
-{
-	const float FogEnabled;
-	const float FogStart;
-	const float FogEnd;
-	const float FogColor;
-};*/
-
-//lets see what we can do with this
-/*float ComputeFogFactor(float d) {
-	//d is the distance to the geometry sampling from the camera
-	//this simply returns a value that interpolates from 0 to 1 
-	//with 0 starting at FogStart and 1 at FogEnd 
-	return clamp((d - FogStart) / (FogEnd - FogStart), 0, 1) * FogEnabled;
 }*/
+
 
 //Nice read!
 //http://gamedev.stackexchange.com/questions/56897/glsl-light-attenuation-color-and-intensity-formula
